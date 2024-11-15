@@ -93,6 +93,75 @@ def parse_ing_depotauszug(file: Path) -> pd.DataFrame:
     return data
 
 
+def parse_ing_abrechnung(file: Path) -> pd.DataFrame:
+    """
+    Parses a given Abrechnung PDF file and returns its contents as a pandas DataFrame.
+
+    Parameters:
+        file (Path): The path to the PDF file.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the parsed data from the Abrechnung PDF file. 
+        The DataFrame has 6 columns: 'date' (datetime), 'amount' (int), 'name' (str), ISIN ('str'), 'Price' (float), 'Market Value' (float).
+    """
+    reader = PdfReader(file)
+    results = {"date": [], "name": [], "isin": [], "order type": [], "order number": [],
+         "trading venue": [], "execution time": [], "amount": [], "price": [], "total cost": []}
+
+    # Regex
+    date_regex = re.compile(r"\bDatum:\s+(\d{2}\.\d{2}\.\d{4})\b")
+    name_regex = re.compile(r"(?<=Wertpapierbezeichnung )(.*?)(?=$|\n)")
+    isin_regex = re.compile(r"(?<=ISIN \(WKN\) )(.*?)(?=$|\n)")
+    order_type_regex = re.compile(r"(?<=Wertpapierabrechnung )(.*?)(?=$|\n)")
+    order_number_regex = re.compile(r"(?<=Ordernummer )(.*?)(?=$|\n)")
+    trading_venue_regex = re.compile(r"(?<=Handelsplatz )(.*?)(?=$|\n)")
+    execution_time_regex = re.compile(r"(?<=um\s)(\d{2}:\d{2}:\d{2})(?=\s*Uhr)")
+    amount_regex = re.compile(r"(?<=Nominale Stück )(.*?)(?=$|\n)")
+    price_regex = re.compile(r"(?<=Kurs \(Festpreisgeschäft\) EUR )(.*?)(?=$|\n)")
+    total_cost_regex = re.compile(r"(?<=Endbetrag zu Ihren Lasten EUR )(.*?)(?=$|\n)")
+
+    for page in reader.pages:
+        content = page.extract_text(0)
+        for line in content.split("\n"):
+
+            date = date_regex.search(line)
+            name = name_regex.search(line)
+            isin = isin_regex.search(line)
+            order_type = order_type_regex.search(line)
+            order_number = order_number_regex.search(line)
+            trading_venue = trading_venue_regex.search(line)
+            execution_time = execution_time_regex.search(line)
+            amount = amount_regex.search(line)
+            price = price_regex.search(line)
+            total_cost = total_cost_regex.search(line)
+
+            if date is not None:
+                results["date"].append(date.group(1))
+            if name is not None:
+                results["name"].append(name.group(1))
+            if isin is not None:
+                results["isin"].append(isin.group(1))
+            if order_type is not None:
+                results["order type"].append(order_type.group(1))
+            if order_number is not None:
+                results["order number"].append(order_number.group(1))
+            if trading_venue is not None:
+                results["trading venue"].append(trading_venue.group(1))
+            if execution_time is not None:
+                results["execution time"].append(execution_time.group(1))
+            if amount is not None:
+                results["amount"].append(amount.group(1))
+            if price is not None:
+                results["price"].append(price.group(1).replace(".", "").replace(",", "."))
+            if total_cost is not None:
+                results["total cost"].append(total_cost.group(1).replace(".", "").replace(",", "."))
+
+    data = pd.DataFrame(results)
+    data["date"] = pd.to_datetime(data["date"], format="%d.%m.%Y")
+    print(data)
+    return data
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -125,10 +194,15 @@ if __name__ == "__main__":
 
     df = []
     if path.is_file() and path.suffix == ".pdf":
+        # Checking account statement
         if 'kontoauszug' in path.name.lower():
             df = parse_ing_kontoauszug(Path(args.path))
+        # Investment account statement
         if 'depotauszug' in path.name.lower():
             df = parse_ing_depotauszug(Path(args.path))
+        # Invoice
+        if 'abrechnung' in path.name.lower():
+            df = parse_ing_abrechnung(Path(args.path))
         else:
             print(f"{path.name} is not a recognized format!")
     elif path.is_dir():
