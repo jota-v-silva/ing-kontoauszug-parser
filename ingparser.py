@@ -43,6 +43,55 @@ def parse_ing_kontoauszug(file: Path) -> pd.DataFrame:
     data["date"] = pd.to_datetime(data["date"], format="%d.%m.%Y")
     return data
 
+def parse_ing_depotauszug(file: Path) -> pd.DataFrame:
+    """
+    Parses a given Depotauszug PDF file and returns its contents as a pandas DataFrame.
+
+    Parameters:
+        file (Path): The path to the PDF file.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the parsed data from the depotauszug PDF file. 
+        The DataFrame has 6 columns: 'date' (datetime), 'amount' (int), 'name' (str), ISIN ('str'), 'Price' (float), 'Market Value' (float).
+    """
+    reader = PdfReader(file)
+    results = {"date": [], "name": [], "isin": [], "amount": [], "price": [], "market value": []}
+
+    # Regex
+    date_regex = re.compile(r"\bDepotauszug per\s+(\d{2}\.\d{2}\.\d{4})\b")
+    name_regex = re.compile(r"\bStück\s+([^0-9]+?)\s+\d+(?:,\d+)?")
+    isin_regex = re.compile(r"ISIN \(WKN\):\s+(.*?)\s+")
+    amount_regex = re.compile(r"\b(\d+(?:,\d+)?)\s+Stück\b")
+    price_regex = re.compile(r"(\d+(?:,\d+)?)\s+EUR(?!$)")
+    market_regex = re.compile(r"EUR\s+(.*?)\s+EUR")
+
+    for page in reader.pages:
+        content = page.extract_text(0)
+        for line in content.split("\n"):
+            date = date_regex.search(line)
+            name = name_regex.search(line)
+            isin = isin_regex.search(line)
+            amount = amount_regex.search(line)
+            price = price_regex.search(line)
+            market_value = market_regex.search(line)
+            if date is not None:
+                results["date"].append(date.group(1))
+            if name is not None:
+                results['name'].append(name.group(1))
+            if isin is not None:
+                results['isin'].append(isin.group(1))
+            if amount is not None:
+                results['amount'].append(float(amount.group(1).replace(".", "").replace(",", ".")))
+            if price is not None:
+                results['price'].append(float(price.group(1).replace(".", "").replace(",", ".")))
+            if market_value is not None:
+                results['market value'].append(float(market_value.group(1).replace(".", "").replace(",", ".")))
+
+    data = pd.DataFrame(results)
+    data["date"] = pd.to_datetime(data["date"], format="%d.%m.%Y")
+    print(data)
+    return data
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -74,10 +123,15 @@ if __name__ == "__main__":
 
     path = Path(args.path)
 
+    df = []
     if path.is_file() and path.suffix == ".pdf":
-        df = parse_ing_kontoauszug(Path(args.path))
+        if 'kontoauszug' in path.name.lower():
+            df = parse_ing_kontoauszug(Path(args.path))
+        if 'depotauszug' in path.name.lower():
+            df = parse_ing_depotauszug(Path(args.path))
+        else:
+            print(f"{path.name} is not a recognized format!")
     elif path.is_dir():
-        df = []
         for file in path.glob("*.pdf"):
             if ("kontoauszug" in file.name.lower()) and (
                 args.account.lower() in file.name.lower()
@@ -88,5 +142,8 @@ if __name__ == "__main__":
         print(f"Invalid input: {path}", file=stderr)
         exit(1)
 
-    df = df.sort_values("date", ascending=False)
-    df.to_csv(args.output, index=False)
+    if not df.empty:
+        df = df.sort_values("date", ascending=False)
+        df.to_csv(args.output, index=False)
+    else:
+        print("The system was unable to parse the input")
