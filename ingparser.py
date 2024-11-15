@@ -117,7 +117,7 @@ def parse_ing_abrechnung(file: Path) -> pd.DataFrame:
     trading_venue_regex = re.compile(r"(?<=Handelsplatz )(.*?)(?=$|\n)")
     execution_time_regex = re.compile(r"(?<=um\s)(\d{2}:\d{2}:\d{2})(?=\s*Uhr)")
     amount_regex = re.compile(r"(?<=Nominale Stück )(.*?)(?=$|\n)")
-    price_regex = re.compile(r"(?<=Kurs \(Festpreisgeschäft\) EUR )(.*?)(?=$|\n)")
+    price_regex = re.compile(r"(?<=Kurs ).*?\b(\d+(?:,\d+)?)\b")
     total_cost_regex = re.compile(r"(?<=Endbetrag zu Ihren Lasten EUR )(.*?)(?=$|\n)")
 
     for page in reader.pages:
