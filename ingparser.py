@@ -161,6 +161,74 @@ def parse_ing_abrechnung(file: Path) -> pd.DataFrame:
     print(data)
     return data
 
+def parse_ing_ertragsabrechnung(file: Path) -> pd.DataFrame:
+    """
+    Parses a given Abrechnung PDF file and returns its contents as a pandas DataFrame.
+
+    Parameters:
+        file (Path): The path to the PDF file.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the parsed data from the Abrechnung PDF file. 
+        The DataFrame has 6 columns: 'date' (datetime), 'amount' (int), 'name' (str), ISIN ('str'), 'Price' (float), 'Market Value' (float).
+    """
+    reader = PdfReader(file)
+    results = {"date": [], "name": [], "isin": [], "amount": [], "div per share": [],
+         "gross dividend": [], "tax percentage": [], "tax": [], "solidarity surcharge percentage": [],
+         "solidarity surcharge": [], "net dividend": []}
+
+    # Regex
+    date_regex = re.compile(r"\bZahltag\s+(\d{2}\.\d{2}\.\d{4})\b")
+    name_regex = re.compile(r"(?<=Wertpapierbezeichnung )(.*?)(?=$|\n)")
+    isin_regex = re.compile(r"(?<=ISIN \(WKN\) )(.*?)(?=$|\n)")
+    amount_regex = re.compile(r"(?<=Nominale )(.*?)(?=$|)(\Stück)")
+    divident_per_share_regex = re.compile(r"(?<=Ertragsausschüttung per Stück )(.*?)(?=$|\n)")
+    dividend_regex = re.compile(r"(?<=Umg. z. Dev.-Kurs )(.*) (.*?)(?=$|\n)")
+    tax_regex = re.compile(r"(?<=Kapitalertragsteuer )(.*) (.*) (.*?)(?=$|\n)")
+    solidarity_regex = re.compile(r"(?<=Solidaritätszuschlag )(.*) (.*) (.*?)(?=$|\n)")
+    net_dividend_regex = re.compile(r"(?<=Gesamtbetrag zu Ihren Gunsten )(.*) (.*?)(?=$|\n)")
+
+    content = reader.pages[0].extract_text(0)
+    for line in content.split("\n"):
+
+        date = date_regex.search(line)
+        name = name_regex.search(line)
+        isin = isin_regex.search(line)
+        amount = amount_regex.search(line)
+        dividend_per_share = divident_per_share_regex.search(line)
+        dividend = dividend_regex.search(line)
+        tax = tax_regex.search(line)
+        solidarity = solidarity_regex.search(line)
+        net_dividend = net_dividend_regex.search(line)
+
+        if date is not None:
+            results["date"].append(date.group(1))
+        if name is not None:
+            results["name"].append(name.group(1))
+        if isin is not None:
+            results["isin"].append(isin.group(1))
+        if amount is not None:
+            results["amount"].append(amount.group(1).replace(".", "").replace(",", "."))
+        if dividend_per_share is not None:
+            results["div per share"].append(dividend_per_share.group(1).replace(".", "").replace(",", "."))
+        if dividend is not None:
+            results["gross dividend"].append(dividend.group(2).replace(".", "").replace(",", "."))
+        if tax is not None:
+            results["tax percentage"].append(tax.group(1))
+        if tax is not None:
+            results["tax"].append(tax.group(3).replace(".", "").replace(",", "."))
+        if solidarity is not None:
+            results["solidarity surcharge percentage"].append(solidarity.group(1))
+        if solidarity is not None:
+            results["solidarity surcharge"].append(solidarity.group(3).replace(".", "").replace(",", "."))
+        if net_dividend is not None:
+            results["net dividend"].append(net_dividend.group(2).replace(".", "").replace(",", "."))
+
+    data = pd.DataFrame(results)
+    data["date"] = pd.to_datetime(data["date"], format="%d.%m.%Y")
+    print(data)
+    return data
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -202,7 +270,12 @@ if __name__ == "__main__":
             df = parse_ing_depotauszug(Path(args.path))
         # Invoice
         if 'abrechnung' in path.name.lower():
-            df = parse_ing_abrechnung(Path(args.path))
+            # Dividend statement
+            if 'ertragsabrechnung' in path.name.lower():
+                df = parse_ing_ertragsabrechnung(Path(args.path))
+            else:
+                df = parse_ing_abrechnung(Path(args.path))
+        
         else:
             print(f"{path.name} is not a recognized format!")
     elif path.is_dir():
