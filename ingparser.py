@@ -102,7 +102,8 @@ def parse_ing_abrechnung(file: Path) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: A DataFrame containing the parsed data from the Abrechnung PDF file. 
-        The DataFrame has 6 columns: 'date' (datetime), 'amount' (int), 'name' (str), ISIN ('str'), 'Price' (float), 'Market Value' (float).
+        The DataFrame has 10 columns: 'date' (datetime), 'name' (str), 'isin' (str), 'order type' ('str'), 'order number' (int),
+         'trading venue' (str), 'execution time' (datetime), 'amount' (float), 'price' (float), 'total cost' (float).
     """
     reader = PdfReader(file)
     results = {"date": [], "name": [], "isin": [], "order type": [], "order number": [],
@@ -163,15 +164,17 @@ def parse_ing_abrechnung(file: Path) -> pd.DataFrame:
 
 def parse_ing_ertragsabrechnung(file: Path) -> pd.DataFrame:
     """
-    Parses a given Abrechnung PDF file and returns its contents as a pandas DataFrame.
+    Parses a given Ertragsabrechnung PDF file and returns its contents as a pandas DataFrame.
 
     Parameters:
         file (Path): The path to the PDF file.
 
     Returns:
-        pd.DataFrame: A DataFrame containing the parsed data from the Abrechnung PDF file. 
-        The DataFrame has 6 columns: 'date' (datetime), 'amount' (int), 'name' (str), ISIN ('str'), 'Price' (float), 'Market Value' (float).
-    """
+        pd.DataFrame: A DataFrame containing the parsed data from the Ertragsabrechnung PDF file. 
+        The DataFrame has 10 columns: 'date' (datetime), 'name' (str), 'isin' (str), 'amount' (float),
+         'div per share' (float), 'gross dividend' (float), 'tax percentage' (float), 
+         'solidarity surcharge percentage' (float), 'solidarity surcharge' (float), 'net dividend' (float)
+    """ 
     reader = PdfReader(file)
     results = {"date": [], "name": [], "isin": [], "amount": [], "div per share": [],
          "gross dividend": [], "tax percentage": [], "tax": [], "solidarity surcharge percentage": [],
@@ -275,7 +278,6 @@ if __name__ == "__main__":
                 df = parse_ing_ertragsabrechnung(Path(args.path))
             else:
                 df = parse_ing_abrechnung(Path(args.path))
-        
         else:
             print(f"{path.name} is not a recognized format!")
     elif path.is_dir():
